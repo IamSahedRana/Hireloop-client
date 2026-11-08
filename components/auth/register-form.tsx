@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useState } from "react"
 
 import { authClient } from "@/lib/auth-client"
 import { AuthField, AuthInput, PasswordInput } from "@/components/auth/auth-fields"
@@ -19,7 +19,6 @@ const roles: { value: Role; label: string; blurb: string }[] = [
 function RegisterFormContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session, isPending: sessionLoading } = authClient.useSession()
 
   const [role, setRole] = useState<Role>("seeker")
   const [name, setName] = useState("")
@@ -31,9 +30,6 @@ function RegisterFormContent() {
 
   const target = searchParams.get("redirect") ?? "/"
 
-  useEffect(() => {
-    if (!sessionLoading && session) router.replace(target)
-  }, [session, sessionLoading, router, target])
   const confirmError =
     confirm.length > 0 && confirm !== password ? "Passwords don't match" : undefined
   const passwordError =

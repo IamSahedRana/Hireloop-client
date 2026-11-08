@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useState } from "react"
 
 import { authClient } from "@/lib/auth-client"
 import { AuthField, AuthInput, PasswordInput } from "@/components/auth/auth-fields"
@@ -11,7 +11,6 @@ import { GoogleSignInButton } from "@/components/auth/google-signin-button"
 function LoginFormContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session, isPending: sessionLoading } = authClient.useSession()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -20,11 +19,6 @@ function LoginFormContent() {
   const [error, setError] = useState<string | null>(null)
 
   const target = searchParams.get("redirect") ?? "/"
-
-  // Already signed in — go to the target page.
-  useEffect(() => {
-    if (!sessionLoading && session) router.replace(target)
-  }, [session, sessionLoading, router, target])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

@@ -7,6 +7,10 @@
     --font-display: var(--font-jakarta), var(--font-heading);
     --font-pixel: var(--font-space-mono), var(--font-mono);
     --font-sans: var(--font-sans);
+    --font-inter: var(--font-inter), var(--font-sans);
+    --font-inter-tight: var(--font-inter-tight), var(--font-sans);
+    --font-rethink: var(--font-rethink), var(--font-sans);
+    --font-instrument: var(--font-instrument), var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);

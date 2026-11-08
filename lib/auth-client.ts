@@ -10,4 +10,6 @@ export const authClient = createAuthClient({
   plugins: [inferAdditionalFields<typeof auth>()],
 })
 
-export const { signIn, signUp, signOut, useSession } = createAuthClient()
+// Re-use the *same* client instance so the destructured helpers keep the
+// inferred types (role, etc.) and the session state stays in sync everywhere.
+export const { signIn, signUp, signOut, useSession } = authClient

@@ -37,9 +37,9 @@ type MenuItem = {
 }
 
 // Sidebar nav from the `HL 2.0/Sidebar` Figma component (per-role variants).
-// The recruiter column follows the design exactly: Dashboard, My Company,
-// Manage Jobs, Applications, Settings — "Add Job" lives in the page actions
-// ("New Job Post" button / floating "Create Job Post" button), not in the nav.
+// The recruiter column follows the design order (Dashboard, My Company,
+// Manage Jobs, Applications, Settings) plus two functional additions the
+// design missed, requested by the user: "Add New Post" and "Payments".
 const menuItemsByRole: Record<Role, MenuItem[]> = {
     seeker: [
         { id: "dashboard", name: "Dashboard", url: "/dashboard/seeker", icon: LayoutDashboard },
@@ -54,7 +54,8 @@ const menuItemsByRole: Record<Role, MenuItem[]> = {
         { id: "my-company", name: "My Company", url: "/dashboard/recruiter/my-company", icon: Building2 },
         { id: "manage-jobs", name: "Manage Jobs", url: "/dashboard/recruiter/jobs", icon: Briefcase },
         { id: "applications", name: "Applications", url: "/dashboard/recruiter/applications", icon: FileText },
-        { id: "add-job", name: "Add Job", url: "/dashboard/recruiter/jobs/new", icon: PlusCircle },
+        { id: "add-new-post", name: "Add New Post", url: "/dashboard/recruiter/jobs/new", icon: PlusCircle },
+        { id: "payments", name: "Payments", url: "/dashboard/recruiter/payments", icon: Wallet },
         { id: "settings", name: "Settings", url: "/dashboard/recruiter/settings", icon: Settings },
     ],
     admin: [
@@ -106,13 +107,28 @@ export function DashboardSidebar() {
     const pathname = usePathname()
     const router = useRouter()
     const { data: session } = authClient.useSession()
-    const role: Role = (session?.user.role as Role) || "seeker"
+
+    // The sidebar follows the area in the URL (so /dashboard/recruiter always
+    // shows recruiter nav), falling back to the signed-in user's role.
+    const area = pathname.startsWith("/dashboard/recruiter")
+        ? "recruiter"
+        : pathname.startsWith("/dashboard/seeker")
+            ? "seeker"
+            : pathname.startsWith("/dashboard/admin")
+                ? "admin"
+                : null
+    const role: Role = area ?? ((session?.user.role as Role) || "seeker")
     const items = menuItemsByRole[role]
 
-    const isActive = (item: MenuItem) =>
-        item.url === "/dashboard/recruiter" || item.url === "/dashboard/seeker" || item.url === "/dashboard/admin"
-            ? pathname === item.url // dashboard is an exact match, sub-routes highlight their own item
-            : pathname === item.url || pathname.startsWith(`${item.url}/`)
+    const matches = (url: string) =>
+        pathname === url || (pathname.startsWith(`${url}/`) && url !== "/dashboard/recruiter" && url !== "/dashboard/seeker" && url !== "/dashboard/admin")
+
+    // Longest matching URL wins, so "/jobs/new" highlights "Add New Post",
+    // not the shorter "Manage Jobs" prefix.
+    const activeId =
+        [...items]
+            .filter((item) => matches(item.url))
+            .sort((a, b) => b.url.length - a.url.length)[0]?.id ?? null
 
     return (
         <Sidebar>
@@ -125,7 +141,7 @@ export function DashboardSidebar() {
                 <SidebarGroup className="px-3 py-4">
                     <nav aria-label="Dashboard" className="flex flex-col">
                         {items.map((item) => (
-                            <NavLink key={item.id} item={item} active={isActive(item)} />
+                            <NavLink key={item.id} item={item} active={item.id === activeId} />
                         ))}
                     </nav>
                 </SidebarGroup>

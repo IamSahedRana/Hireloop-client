@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Bell, Search } from "lucide-react"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -13,16 +13,22 @@ import { cn } from "@/lib/utils"
  */
 export function DashboardTopBar({ className }: React.ComponentProps<"header">) {
     const router = useRouter()
+    const pathname = usePathname()
     const { data: session } = authClient.useSession()
     const user = session?.user
 
     const name = user?.name || ""
     const role = typeof user?.role === "string" ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ""
 
+    // Search filters the job table of the area the user is browsing.
+    const searchTarget = pathname.startsWith("/dashboard/seeker")
+        ? "/dashboard/seeker/jobs"
+        : "/dashboard/recruiter/jobs"
+
     const submit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault()
         const q = String(new FormData(event.currentTarget).get("q") ?? "").trim()
-        if (q) router.push(`/dashboard/recruiter/jobs?q=${encodeURIComponent(q)}`)
+        if (q) router.push(`${searchTarget}?q=${encodeURIComponent(q)}`)
     }
 
     return (

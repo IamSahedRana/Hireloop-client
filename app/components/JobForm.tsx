@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { createJob, updateJob } from "@/lib/actions/jobs"
+import { COMPANY_STORAGE_KEY } from "@/app/components/CompanyForm"
 import type { Job, JobFormData, JobType } from "@/lib/types/job"
 import { cn } from "@/lib/utils"
 
@@ -93,6 +94,21 @@ export function JobForm({ mode, job }: { mode: "create" | "edit"; job?: Job | nu
     const [form, setForm] = React.useState<JobFormData>({ ...initial, deadline: toDateInput(job?.deadline) })
     const [submitting, setSubmitting] = React.useState(false)
     const [error, setError] = React.useState<string | null>(null)
+
+    // Creating a post: default the company name to the saved "My Company"
+    // profile so recruiters don't retype it for every listing.
+    React.useEffect(() => {
+        if (mode !== "create") return
+        try {
+            const saved = JSON.parse(window.localStorage.getItem(COMPANY_STORAGE_KEY) ?? "{}") as { name?: string }
+            const savedName = saved.name?.trim()
+            if (savedName) {
+                setForm((prev) => (prev.companyName.trim() ? prev : { ...prev, companyName: savedName }))
+            }
+        } catch {
+            // ignore malformed localStorage — the field stays empty
+        }
+    }, [mode])
 
     // Generic flat setter so every field is just setField("key")(value).
     const set =

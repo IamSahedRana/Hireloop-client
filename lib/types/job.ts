@@ -4,6 +4,19 @@
 
 export type JobType = "full-time" | "part-time" | "contract" | "internship"
 
+/** Options shared by the "Post a New Job" form and the browse-jobs filters. */
+export const JOB_TYPES: JobType[] = ["full-time", "part-time", "contract", "internship"]
+
+/** Categories shared by the "Post a New Job" form and the browse-jobs filters. */
+export const JOB_CATEGORIES = [
+    "Engineering & Tech",
+    "Design",
+    "Product",
+    "Marketing",
+    "Infrastructure",
+    "Quality",
+]
+
 export type JobFormData = {
     title: string
     companyName: string

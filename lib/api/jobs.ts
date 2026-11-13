@@ -17,8 +17,28 @@ async function apiFetch(path: string): Promise<unknown | null> {
     }
 }
 
-export async function getJobs(): Promise<Job[]> {
-    const data = await apiFetch("/jobs")
+/** Filter params the Express `GET /jobs` endpoint understands. */
+export type JobQueryFilters = {
+    /** Free-text match on title/company (backend `search`). */
+    search?: string
+    /** Multi-select (backend matches with `$in`). */
+    jobType?: string[]
+    category?: string[]
+    /** Remote-only toggle. */
+    isRemote?: boolean
+}
+
+/** `GET /jobs` with optional filters; returns newest-first normalized jobs. */
+export async function getJobs(filters: JobQueryFilters = {}): Promise<Job[]> {
+    const params = new URLSearchParams()
+    const search = filters.search?.trim()
+    if (search) params.set("search", search)
+    for (const type of filters.jobType ?? []) params.append("jobType", type)
+    for (const category of filters.category ?? []) params.append("category", category)
+    if (filters.isRemote !== undefined) params.set("isRemote", String(filters.isRemote))
+    const query = params.toString()
+
+    const data = await apiFetch(`/jobs${query ? `?${query}` : ""}`)
     if (!Array.isArray(data)) return []
     return data
         .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")

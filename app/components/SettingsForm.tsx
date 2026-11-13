@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/toast"
 import { authClient } from "@/lib/auth-client"
+import { UserAvatar } from "@/components/shared/user-avatar"
 import { cn } from "@/lib/utils"
 
 // Surfaces from the `Seeker / Settings` Figma frame: #141418 cards, #0c0c0f
@@ -146,21 +147,7 @@ export function SettingsForm() {
                 <form onSubmit={updateProfile} className="mt-6 flex flex-col gap-6">
                     {/* Avatar */}
                     <div className="flex items-center gap-5">
-                        {user?.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                                src={user.image}
-                                alt=""
-                                className="size-24 rounded-full object-cover ring-1 ring-white/10"
-                            />
-                        ) : (
-                            <span
-                                aria-hidden="true"
-                                className="flex size-24 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7b74ff,#5c53fe)] text-3xl font-semibold text-white ring-1 ring-white/15"
-                            >
-                                {(name.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase()}
-                            </span>
-                        )}
+                        <UserAvatar name={name} src={user?.image} className="size-24" />
                         <div className="flex flex-col gap-2">
                             <label className={cn(secondaryButton, "inline-flex cursor-pointer items-center gap-2")}>
                                 <Upload aria-hidden="true" className="size-4" />

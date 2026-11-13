@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import {
     Bookmark,
     Building2,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 
 import { authClient } from "@/lib/auth-client"
+import { useSignOut } from "@/components/shared/use-sign-out"
 import {
     Sidebar,
     SidebarContent,
@@ -97,15 +98,9 @@ function NavLink({ item, active }: { item: MenuItem; active: boolean }) {
     )
 }
 
-async function signOutAndLeave(router: ReturnType<typeof useRouter>) {
-    await authClient.signOut()
-    router.push("/")
-    router.refresh()
-}
-
 export function DashboardSidebar() {
     const pathname = usePathname()
-    const router = useRouter()
+    const { signOut } = useSignOut()
     const { data: session } = authClient.useSession()
 
     // The sidebar follows the area in the URL (so /dashboard/recruiter always
@@ -149,7 +144,7 @@ export function DashboardSidebar() {
             <SidebarFooter className="p-3 pb-5">
                 <button
                     type="button"
-                    onClick={() => void signOutAndLeave(router)}
+                    onClick={() => void signOut()}
                     className="flex h-[34px] w-full items-center gap-2.5 rounded-[12px] px-2.5 text-[13px] font-medium text-[#a1a4aa] transition-colors hover:bg-[#1b1b1e]"
                 >
                     <LogOut className="size-[18px] shrink-0" aria-hidden="true" />

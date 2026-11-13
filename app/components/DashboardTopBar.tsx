@@ -5,6 +5,7 @@ import { Bell, Search } from "lucide-react"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
+import { UserAvatar } from "@/components/shared/user-avatar"
 import { cn } from "@/lib/utils"
 
 /**
@@ -72,22 +73,7 @@ export function DashboardTopBar({ className }: React.ComponentProps<"header">) {
                         <span className="text-[13px] font-medium text-[#ededef]">{name}</span>
                         <span className="text-[11px] text-[#ededef]/40">{role}</span>
                     </div>
-                    {user?.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={user.image}
-                            alt=""
-                            aria-hidden="true"
-                            className="size-[34px] rounded-full object-cover"
-                        />
-                    ) : (
-                        <span
-                            aria-hidden="true"
-                            className="flex size-[34px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#7b74ff,#5c53fe)] text-sm font-semibold text-white ring-1 ring-white/15"
-                        >
-                            {(name.charAt(0) || "U").toUpperCase()}
-                        </span>
-                    )}
+                    <UserAvatar name={name} src={user?.image} className="size-[34px]" />
                 </div>
             </div>
         </header>

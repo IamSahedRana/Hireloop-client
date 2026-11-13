@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 
 import { auth } from "@/lib/auth"
 import { SiteNavbar } from "@/components/site-navbar"
+import { UserAvatar } from "@/components/shared/user-avatar"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -28,18 +29,15 @@ function RoleBadge({ role }: { role: string | null | undefined }) {
 
 /** Circle with the user's initial — same treatment as the navbar avatar, at Figma's 96px. */
 function BigAvatar({ name }: { name: string }) {
-  const initial = name.trim().charAt(0).toUpperCase() || "U"
   return (
-    <div
-      aria-hidden="true"
+    <UserAvatar
+      name={name}
       className={cn(
-        "flex size-24 items-center justify-center rounded-full text-4xl font-semibold text-white",
-        "bg-[linear-gradient(135deg,#7b74ff,#5c53fe)]",
-        "shadow-[inset_0_2px_4px_rgba(255,255,255,0.25),0_8px_24px_rgba(92,83,254,0.35)] ring-1 ring-white/20",
+        "size-24 text-4xl",
+        "shadow-[inset_0_2px_4px_rgba(255,255,255,0.25),0_8px_24px_rgba(92,83,254,0.35)]",
       )}
-    >
-      {initial}
-    </div>
+      initialClassName="text-4xl font-semibold"
+    />
   )
 }
 

@@ -65,7 +65,7 @@ export default async function BrowseJobsPage({
             <main className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-8">
                 <JobSearchBar query={query} />
 
-                <div className="mt-8 grid gap-6 lg:grid-cols-[296px_1fr] lg:gap-8">
+                <div className="mt-8 grid gap-6 md:grid-cols-[296px_1fr] md:gap-8">
                     <FilterSidebar
                         query={query}
                         typeOptions={toOptions(JOB_TYPES, typeCounts)}

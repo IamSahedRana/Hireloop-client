@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter, usePathname } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { ChevronDown, LogOut, Menu, UserRound, X } from "lucide-react"
 import * as React from "react"
 
@@ -15,20 +15,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { UserAvatar } from "@/components/shared/user-avatar"
+import { useSignOut } from "@/components/shared/use-sign-out"
 import { cn } from "@/lib/utils"
 
+// Nav items from the Figma `nav-bar` (Browse Jobs · Company · Pricing).
+// "Dashboard" is a functional addition per request: signed-in users only.
 const navLinks = [
   { label: "Browse Jobs", href: "/jobs" },
   { label: "Companies", href: "/companies" },
   { label: "Pricing", href: "/pricing" },
+  { label: "Dashboard", href: "/dashboard", authOnly: true },
 ]
 
 function NavBarLinks({ className, itemClassName }: { className?: string; itemClassName?: string }) {
   const pathname = usePathname()
+  // Dashboard is session-gated: wait for the store to resolve (isPending)
+  // so the signed-in state never leaks into SSR HTML or hydration flash.
+  const { data: session, isPending } = authClient.useSession()
+
+  const links = navLinks.filter((link) => !link.authOnly || (!isPending && !!session?.user))
 
   return (
     <nav aria-label="Main navigation" className={cn("flex flex-col gap-1", className)}>
-      {navLinks.map((link) => {
+      {links.map((link) => {
         const isActive = pathname.startsWith(link.href)
 
         return (
@@ -50,40 +60,12 @@ function NavBarLinks({ className, itemClassName }: { className?: string; itemCla
   )
 }
 
-/** 32px avatar chip: brand gradient with the user's initial (Figma: 32×32 ellipse). */
-function Avatar({ name, className }: { name?: string | null; className?: string }) {
-  const initial = (name ?? "").trim().charAt(0).toUpperCase()
-
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full",
-        "bg-[linear-gradient(135deg,#7b74ff,#5c53fe)] text-sm font-semibold text-white",
-        "shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-white/20",
-        className
-      )}
-    >
-      {initial || "U"}
-    </span>
-  )
-}
-
 /** Right-side cluster for the navbar bar: buttons when signed out, avatar menu when signed in. */
 function NavBarAuth({ className }: { className?: string }) {
-  const router = useRouter()
   const { data: session, isPending } = authClient.useSession()
-  const [loggingOut, setLoggingOut] = React.useState(false)
+  const { signOut, loggingOut } = useSignOut()
 
-  const user = session?.user
-
-  async function handleLogout() {
-    setLoggingOut(true)
-    await authClient.signOut()
-    router.replace("/")
-    router.refresh()
-    setLoggingOut(false)
-  }
+  const user = session?.user ?? null
 
   // keep the bar from jumping while the session resolves
   if (isPending) {
@@ -135,7 +117,7 @@ function NavBarAuth({ className }: { className?: string }) {
             "hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#5c53fe]/70",
           )}
         >
-          <Avatar name={user.name} />
+          <UserAvatar name={user.name} className="size-8" />
           <ChevronDown aria-hidden="true" className="size-4 text-white/60" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -148,7 +130,7 @@ function NavBarAuth({ className }: { className?: string }) {
         >
           {/* header: who is signed in */}
           <div className="flex items-center gap-3 rounded-[10px] bg-[#1a1a1f] p-3">
-            <Avatar name={user.name} className="size-10" />
+            <UserAvatar name={user.name} className="size-10" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">{user.name}</p>
               <p className="truncate text-xs text-white/60">{user.email}</p>
@@ -168,7 +150,7 @@ function NavBarAuth({ className }: { className?: string }) {
           <DropdownMenuItem
             onClick={(event) => {
               event.preventDefault()
-              void handleLogout()
+              void signOut()
             }}
             disabled={loggingOut}
             variant="destructive"

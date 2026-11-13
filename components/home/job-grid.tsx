@@ -39,7 +39,7 @@ function JobCard({ className }: { className?: string }) {
         </ul>
       </div>
       <Link
-        href="/jobs"
+        href="/browse-jobs"
         className="mt-auto flex h-[55px] w-[154px] items-center justify-between rounded-[12px] bg-[#0b0b0c] px-6 text-[16px] font-semibold text-white transition hover:bg-[#0b0b0c]/70"
       >
         Apply Now
@@ -64,7 +64,7 @@ export function JobGrid({ className }: React.ComponentProps<"section">) {
         </div>
         <div className="mt-10 flex justify-center">
           <Link
-            href="/jobs"
+            href="/browse-jobs"
             className="flex h-[58px] items-center rounded-[12px] bg-white px-6 text-[18px] font-medium text-[#0b0b14] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition hover:bg-white/90"
           >
             View all job open

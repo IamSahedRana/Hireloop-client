@@ -93,7 +93,7 @@ export function SiteHero({ className }: React.ComponentProps<"section">) {
 
         {/* search bar */}
         <form
-          action="/jobs"
+          action="/browse-jobs"
           method="get"
           className="mt-9 flex h-16 w-full max-w-[784px] items-center rounded-[16px] border border-white/[0.09] bg-[#101010] p-1.5 transition focus-within:border-white/25"
         >

@@ -15,18 +15,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { createJob, updateJob } from "@/lib/actions/jobs"
 import { COMPANY_STORAGE_KEY } from "@/app/components/CompanyForm"
 import type { Job, JobFormData, JobType } from "@/lib/types/job"
+import { JOB_CATEGORIES, JOB_TYPES } from "@/lib/types/job"
 import { cn } from "@/lib/utils"
-
-const JOB_CATEGORIES = [
-    "Engineering & Tech",
-    "Design",
-    "Product",
-    "Marketing",
-    "Infrastructure",
-    "Quality",
-]
-
-const JOB_TYPES: JobType[] = ["full-time", "part-time", "contract", "internship"]
 
 const SALARY_FREQUENCIES = ["per hour", "per day", "per week", "per month", "per year"]
 

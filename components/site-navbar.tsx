@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils"
 // Nav items from the Figma `nav-bar` (Browse Jobs · Company · Pricing).
 // "Dashboard" is a functional addition per request: signed-in users only.
 const navLinks = [
-  { label: "Browse Jobs", href: "/jobs" },
+  { label: "Browse Jobs", href: "/browse-jobs" },
   { label: "Companies", href: "/companies" },
   { label: "Pricing", href: "/pricing" },
   { label: "Dashboard", href: "/dashboard", authOnly: true },

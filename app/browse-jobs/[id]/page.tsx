@@ -7,7 +7,7 @@ import { getJob } from "@/lib/api/jobs"
 import { formatCompensation, formatDeadline } from "@/lib/types/job"
 import { SiteFooter } from "@/components/site-footer"
 import { SiteNavbar } from "@/components/site-navbar"
-import { ApplyJobButton } from "@/app/components/ApplyJobButton"
+import { ApplyButton } from "@/components/jobs/apply-button"
 import { SaveJobButton } from "@/app/components/SaveJobButton"
 
 type Params = { params: Promise<{ id: string }> }
@@ -104,8 +104,11 @@ export default async function JobDetailsPage({ params }: Params) {
                             icon="bookmark"
                             className="size-12 rounded-lg bg-[#222228] text-[#e5e2e3] hover:text-white"
                         />
-                        <ApplyJobButton
+                        <ApplyButton
+                            jobId={job._id}
                             title={job.title}
+                            companyName={job.companyName}
+                            redirectTo={`/browse-jobs/${job._id}`}
                             className="h-12 rounded-lg bg-[#fafafa] px-4 text-base font-medium text-[#0b0b0c] hover:bg-white"
                         />
                     </div>

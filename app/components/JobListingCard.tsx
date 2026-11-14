@@ -2,7 +2,7 @@ import { MapPin } from "lucide-react"
 
 import type { Job } from "@/lib/types/job"
 import { formatCompensation, formatDeadline } from "@/lib/types/job"
-import { ApplyJobButton } from "@/app/components/ApplyJobButton"
+import { ApplyButton } from "@/components/jobs/apply-button"
 import { SaveJobButton } from "@/app/components/SaveJobButton"
 import { ViewJobDialog } from "@/app/components/ViewJobDialog"
 
@@ -42,7 +42,13 @@ export function JobListingCard({ job }: { job: Job }) {
                 </span>
                 <div className="flex items-center gap-2">
                     <ViewJobDialog job={job} />
-                    <ApplyJobButton title={job.title} />
+                    <ApplyButton
+                        jobId={job._id}
+                        title={job.title}
+                        companyName={job.companyName}
+                        redirectTo={`/browse-jobs/${job._id}`}
+                        className="h-8 rounded-md bg-[#5c53fe] px-4 text-[13px] font-medium text-white hover:bg-[#7b74ff]"
+                    />
                 </div>
             </div>
         </article>

@@ -1,7 +1,6 @@
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { SidebarProvider } from "@/components/ui/sidebar"
-import { Toaster } from "@/components/ui/toast"
 
 import { DashboardSidebar } from "../components/DashboardSidebar"
 import { auth } from "@/lib/auth"
@@ -24,7 +23,6 @@ const DashboardLayout = async ({ children }: { children: React.ReactNode }) => {
             <main className="min-h-svh min-w-0 flex-1 flex-col bg-[#0e0e11] text-white">
                 {children}
             </main>
-            <Toaster />
         </SidebarProvider>
     )
 }

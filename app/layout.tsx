@@ -12,6 +12,7 @@ import {
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toast"
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'})
@@ -56,7 +57,11 @@ export default function RootLayout({
       )}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          {/* mounted once at the root so toasts work on public + dashboard pages */}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )

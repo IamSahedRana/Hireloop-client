@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Star } from "lucide-react"
+import { Bookmark, Star } from "lucide-react"
 
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
@@ -23,8 +23,25 @@ function writeSavedJobIds(ids: string[]) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
 }
 
-/** Star toggle on job cards — persists to localStorage and notifies on save. */
-export function SaveJobButton({ jobId, title, className }: { jobId: string; title: string; className?: string }) {
+/**
+ * Save toggle on job cards — persists to localStorage and notifies on save.
+ * `icon` picks the glyph (Figma uses a bookmark on the public pages, the
+ * dashboard a star); `variant="ghost"` drops the boxed border for the
+ * public list card.
+ */
+export function SaveJobButton({
+    jobId,
+    title,
+    className,
+    icon = "star",
+    variant = "default",
+}: {
+    jobId: string
+    title: string
+    className?: string
+    icon?: "star" | "bookmark"
+    variant?: "default" | "ghost"
+}) {
     const [saved, setSaved] = React.useState(false)
 
     React.useEffect(() => {
@@ -41,6 +58,8 @@ export function SaveJobButton({ jobId, title, className }: { jobId: string; titl
         }
     }
 
+    const Icon = icon === "bookmark" ? Bookmark : Star
+
     return (
         <button
             type="button"
@@ -48,14 +67,21 @@ export function SaveJobButton({ jobId, title, className }: { jobId: string; titl
             aria-pressed={saved}
             aria-label={saved ? `Remove ${title} from saved jobs` : `Save ${title}`}
             className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-md border transition-colors",
+                "flex shrink-0 items-center justify-center rounded-md border transition-colors",
+                variant === "ghost"
+                    ? "border-transparent bg-transparent"
+                    : "size-8 border-white/10 bg-[#1A1A1F]",
                 saved
-                    ? "border-amber-400/40 bg-amber-400/15 text-amber-300"
-                    : "border-white/10 bg-[#1A1A1F] text-white/50 hover:border-white/25 hover:text-white",
+                    ? variant === "ghost"
+                        ? "border-transparent text-amber-300"
+                        : "border-amber-400/40 bg-amber-400/15 text-amber-300"
+                    : variant === "ghost"
+                        ? "bg-transparent text-[#8e9192] hover:text-white"
+                        : "text-white/50 hover:border-white/25 hover:text-white",
                 className,
             )}
         >
-            <Star aria-hidden="true" className={cn("size-4", saved && "fill-current")} />
+            <Icon aria-hidden="true" className={cn("size-4", saved && "fill-current")} />
         </button>
     )
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
@@ -6,7 +7,9 @@ import { Bookmark, FileText, Briefcase } from "lucide-react"
 
 import { auth } from "@/lib/auth"
 import { getJobs } from "@/lib/api/jobs"
+import { fetchApplications } from "@/lib/api/applications"
 import { DashboardTopBar } from "@/app/components/DashboardTopBar"
+import { SavedJobsCount } from "@/components/shared/saved-jobs-count"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -24,11 +27,12 @@ export default async function SeekerDashboardPage() {
 
     const jobs = await getJobs()
     const activeJobs = jobs.filter((job) => job.status === "active").length
+    const applications = await fetchApplications({ applicantId: session.user.id })
 
     const stats = [
-        { label: "Open Roles", value: activeJobs, Icon: Briefcase },
-        { label: "My Applications", value: 0, Icon: FileText },
-        { label: "Saved Jobs", value: "—", Icon: Bookmark },
+        { label: "Open Roles", value: activeJobs as ReactNode, Icon: Briefcase },
+        { label: "My Applications", value: applications.length as ReactNode, Icon: FileText },
+        { label: "Saved Jobs", value: <SavedJobsCount />, Icon: Bookmark },
     ]
 
     return (

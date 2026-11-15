@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { Check, CircleCheck, Download, Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/toast"
 import { authClient } from "@/lib/auth-client"
+import { PLANS, type Plan } from "@/lib/plans"
 import { cn } from "@/lib/utils"
 
 // Surfaces from the `Seeker / Billing & Subscription` Figma frame:
@@ -21,43 +23,6 @@ import { cn } from "@/lib/utils"
 const cardClass = "rounded-2xl border border-white/5 bg-[#141418] p-6 sm:p-7"
 const headingClass = "font-heading text-[22px] font-semibold text-[#ededef]"
 const chipClass = "inline-flex h-[21px] items-center rounded-[4px] px-3 text-[11px] font-medium"
-
-type Plan = {
-    id: string
-    name: string
-    price: number
-    blurb: string
-    features: string[]
-}
-
-const PLANS: Plan[] = [
-    {
-        id: "starter",
-        name: "Starter Tier",
-        price: 0,
-        blurb: "Get to know the platform with core job discovery.",
-        features: ["10 Applications / month", "Basic job matching", "Email support"],
-    },
-    {
-        id: "standard",
-        name: "Standard Tier",
-        price: 12,
-        blurb: "Level up your search with insights and faster apply.",
-        features: ["Unlimited Applications", "Premium Job Insights", "Priority Candidate Badge"],
-    },
-    {
-        id: "professional",
-        name: "Professional Tier",
-        price: 29,
-        blurb: "Unlock global job insights and unlimited applications.",
-        features: [
-            "Unlimited Applications",
-            "Premium Job Insights",
-            "Priority Candidate Badge",
-            "Direct Recruiter Messaging",
-        ],
-    },
-]
 
 const STORAGE_KEY = "hireloop:plan"
 
@@ -92,6 +57,7 @@ const tdClass = "px-4 py-3.5 text-[13px] text-[#ededef]"
  * shared by the recruiter "Payments" and seeker "Billing" routes.
  */
 export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruiter" }) {
+    const router = useRouter()
     const { data: session } = authClient.useSession()
     const [current, setCurrent] = React.useState<Plan | null>(null)
     const [billingOn, setBillingOn] = React.useState<string | null>(null)
@@ -111,6 +77,19 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
             description: `You're now on the ${plan.name}${plan.price ? ` — $${plan.price}/mo` : " — free"}.`,
             type: "success",
         })
+    }
+
+    /**
+     * Real checkout: paid tiers go through Stripe (order summary → hosted
+     * checkout → verified success page, which persists the plan). Free tiers
+     * apply instantly without payment.
+     */
+    const selectPlan = (plan: Plan) => {
+        if (plan.price > 0) {
+            router.push(`/checkout?plan=${plan.id}`)
+            return
+        }
+        applyPlan(plan)
     }
 
     const plan = current ?? PLANS[2]
@@ -171,7 +150,7 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                         <PlanPickerDialog
                             plans={PLANS}
                             currentId={plan.id}
-                            onSelect={applyPlan}
+                            onSelect={selectPlan}
                             trigger={
                                 <Button className="h-8 bg-[#fafafa] px-4 text-[13px] font-medium text-[#0b0b0c] hover:bg-white">
                                     Upgrade Plan
@@ -181,7 +160,7 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                         <PlanPickerDialog
                             plans={PLANS}
                             currentId={plan.id}
-                            onSelect={applyPlan}
+                            onSelect={selectPlan}
                             trigger={
                                 <Button className="h-8 border border-white/10 bg-[#1a1a1f] px-4 text-[13px] text-[#ededef] hover:bg-[#232327]">
                                     Manage Plan
@@ -359,14 +338,17 @@ function PlanPickerDialog({
     onSelect: (plan: Plan) => void
     trigger: React.ReactElement
 }) {
+    // controlled so a selection can close the dialog before navigating
+    const [open, setOpen] = React.useState(false)
+
     return (
-        <Dialog>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger render={trigger} />
             <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="text-left">Choose your plan</DialogTitle>
                     <DialogDescription className="text-left">
-                        Switch anytime — changes apply to your next billing cycle.
+                        Switch anytime — paid tiers go through a secure Stripe checkout.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -377,7 +359,10 @@ function PlanPickerDialog({
                                 key={plan.id}
                                 type="button"
                                 disabled={isCurrent}
-                                onClick={() => onSelect(plan)}
+                                onClick={() => {
+                                    onSelect(plan)
+                                    setOpen(false)
+                                }}
                                 className={cn(
                                     "flex flex-col gap-3 rounded-xl border p-4 text-left transition-colors",
                                     isCurrent

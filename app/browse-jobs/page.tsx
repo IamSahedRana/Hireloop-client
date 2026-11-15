@@ -35,6 +35,7 @@ export default async function BrowseJobsPage({
     const query = parseJobQuery(await searchParams)
     const filters = {
         search: query.search,
+        location: query.location,
         jobType: query.jobType,
         category: query.category,
         isRemote: query.remoteOnly || undefined,

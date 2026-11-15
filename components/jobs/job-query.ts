@@ -12,6 +12,8 @@ export type JobSort = "recent" | "oldest"
 
 export type JobQuery = {
     search: string
+    /** "Location or Remote" from the hero search. */
+    location: string
     jobType: JobType[]
     category: string[]
     remoteOnly: boolean
@@ -20,6 +22,7 @@ export type JobQuery = {
 
 export const defaultJobQuery: JobQuery = {
     search: "",
+    location: "",
     jobType: [],
     category: [],
     remoteOnly: false,
@@ -38,6 +41,7 @@ export function parseJobQuery(searchParams: SearchParams): JobQuery {
     const sort = searchParams.sort === "oldest" ? "oldest" : "recent"
     return {
         search: typeof searchParams.q === "string" ? searchParams.q : "",
+        location: typeof searchParams.location === "string" ? searchParams.location : "",
         jobType: asArray(searchParams.jobType).filter((v): v is JobType =>
             (JOB_TYPE_SET as Set<string>).has(v),
         ),
@@ -51,6 +55,7 @@ export function parseJobQuery(searchParams: SearchParams): JobQuery {
 export function jobQueryToSearchParams(query: JobQuery): URLSearchParams {
     const params = new URLSearchParams()
     if (query.search.trim()) params.set("q", query.search.trim())
+    if (query.location.trim()) params.set("location", query.location.trim())
     for (const type of query.jobType) params.append("jobType", type)
     for (const category of query.category) params.append("category", category)
     if (query.remoteOnly) params.set("remote", "1")

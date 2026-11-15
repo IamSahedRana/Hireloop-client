@@ -135,7 +135,7 @@ export function SiteHero({ className }: React.ComponentProps<"section">) {
           {trending.map((title) => (
             <Link
               key={title}
-              href={`/jobs?q=${encodeURIComponent(title)}`}
+              href={`/browse-jobs?q=${encodeURIComponent(title)}`}
               className="rounded-full border border-white/[0.06] bg-[#1a1a1b] px-4 py-2 text-sm text-white transition hover:bg-white/10"
             >
               {title}

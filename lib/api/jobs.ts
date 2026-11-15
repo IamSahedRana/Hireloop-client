@@ -26,6 +26,12 @@ export type JobQueryFilters = {
     category?: string[]
     /** Remote-only toggle. */
     isRemote?: boolean
+    /**
+     * Location filter (hero search "Location or Remote"). The backend has no
+     * location param yet, so this is applied after the fetch — "remote"
+     * matches both `isRemote` jobs and locations containing "remote".
+     */
+    location?: string
 }
 
 /** `GET /jobs` with optional filters; returns newest-first normalized jobs. */
@@ -40,7 +46,7 @@ export async function getJobs(filters: JobQueryFilters = {}): Promise<Job[]> {
 
     const data = await apiFetch(`/jobs${query ? `?${query}` : ""}`)
     if (!Array.isArray(data)) return []
-    return data
+    let jobs = data
         .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
         .map(normalizeJob)
         .sort((a, b) => {
@@ -49,6 +55,16 @@ export async function getJobs(filters: JobQueryFilters = {}): Promise<Job[]> {
             if (a._id > b._id) return -1
             return 0
         })
+
+    // location narrowing happens here (see JobQueryFilters.location)
+    const location = filters.location?.trim().toLowerCase()
+    if (location) {
+        jobs =
+            location === "remote"
+                ? jobs.filter((job) => job.isRemote || job.location.toLowerCase().includes("remote"))
+                : jobs.filter((job) => job.location.toLowerCase().includes(location))
+    }
+    return jobs
 }
 
 export async function getJob(id: string): Promise<Job | null> {

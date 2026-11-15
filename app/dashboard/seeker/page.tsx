@@ -24,6 +24,8 @@ const statTileClass = "flex size-10 items-center justify-center rounded-[10px] b
 export default async function SeekerDashboardPage() {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) redirect("/login?redirect=/dashboard/seeker")
+    // role guard: a signed-in recruiter/admin doesn't belong on the seeker home
+    if (session.user.role !== "seeker") redirect(`/dashboard/${session.user.role ?? "seeker"}`)
 
     const jobs = await getJobs()
     const activeJobs = jobs.filter((job) => job.status === "active").length

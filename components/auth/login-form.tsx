@@ -24,7 +24,7 @@ function LoginFormContent() {
     e.preventDefault()
     setError(null)
     setPending(true)
-    const { error: resError } = await authClient.signIn.email({
+    const { data: resData, error: resError } = await authClient.signIn.email({
       email,
       password,
       rememberMe,
@@ -35,7 +35,16 @@ function LoginFormContent() {
       setPending(false)
       return
     }
-    router.replace(target)
+    // The ?redirect= target may name a dashboard that doesn't belong to this
+    // account's role (e.g. a seeker following a recruiter's link). Never land
+    // a user on someone else's dashboard — send them to their own home.
+    const role = resData?.user?.role
+    const dashboardMatch = /^\/dashboard\/(seeker|recruiter|admin)(?:$|[/?#])/.exec(target)
+    if (role && dashboardMatch && dashboardMatch[1] !== role) {
+      router.replace(`/dashboard/${role}`)
+    } else {
+      router.replace(target)
+    }
     router.refresh()
   }
 
@@ -122,7 +131,9 @@ function LoginFormContent() {
         <span aria-hidden="true" className="h-px flex-1 bg-white/[0.09]" />
       </div>
 
-      <GoogleSignInButton callbackURL={target} className="mt-5" />
+      // Google sign-in has no known role until it completes, so it goes to the
+  // role-agnostic /dashboard entry point, which routes by account role.
+  <GoogleSignInButton callbackURL="/dashboard" className="mt-5" />
 
       <p className="mt-6 text-center text-sm text-white/70">
         Don&apos;t have an account?{" "}

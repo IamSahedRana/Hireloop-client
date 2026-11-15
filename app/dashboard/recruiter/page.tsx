@@ -26,6 +26,8 @@ const sectionHeading = "font-inter text-[22px] font-semibold text-[#ededef]"
 export default async function RecruiterDashboardPage() {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) redirect("/login?redirect=/dashboard/recruiter")
+    // role guard: a signed-in seeker/admin doesn't belong on the recruiter home
+    if (session.user.role !== "recruiter") redirect(`/dashboard/${session.user.role ?? "seeker"}`)
 
     const [jobs, applications] = await Promise.all([getJobs(), getApplications()])
 

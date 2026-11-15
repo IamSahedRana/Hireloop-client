@@ -3,41 +3,47 @@ import Link from "next/link"
 import { CircleCheck, CircleAlert, Clock3 } from "lucide-react"
 
 import { stripe } from "@/lib/stripe"
+import { recordPayment } from "@/lib/api/payments"
 import { formatPrice, getPlan } from "@/lib/plans"
 import { SiteFooter } from "@/components/site-footer"
 import { SiteNavbar } from "@/components/site-navbar"
-import { SuccessPlanSync } from "@/components/checkout/success-plan-sync"
+import { SuccessReturn } from "@/components/checkout/success-return"
 
 export const metadata: Metadata = {
     title: "Payment successful — HireLoop",
 }
 
-type SearchParams = { searchParams: Promise<{ session_id?: string }> }
+type SearchParams = { searchParams: Promise<{ session_id?: string; redirect?: string }> }
 
 /**
  * Stripe redirects here with `?session_id=…`. The session is verified
  * server-side (never trust the redirect alone): only `payment_status`
- * "paid" unlocks the confirmation, and the bought plan is persisted from
- * the session metadata rather than the URL.
+ * "paid" unlocks the confirmation. The payment is then persisted by the
+ * Express backend, which re-verifies the session against Stripe with its
+ * own secret key — the URL alone can never mark an account as paid.
  */
 export default async function CheckoutSuccessPage({ searchParams }: SearchParams) {
-    const { session_id: sessionId } = await searchParams
+    const { session_id: sessionId, redirect: rawRedirect } = await searchParams
+
+    // same-origin relative return target only (mirrors the API route's guard)
+    const returnTo =
+        rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") && !rawRedirect.includes("\\")
+            ? rawRedirect
+            : "/dashboard"
 
     let status: "paid" | "processing" | "invalid" = "invalid"
     let planName: string | null = null
-    let planId: string | null = null
     let amount: number | null = null
     let currency = "usd"
     let sessionIdShort: string | null = null
     let paidAt: string | null = null
+    let stored = false
 
     if (sessionId) {
         try {
             const checkout = await stripe.checkout.sessions.retrieve(sessionId)
             sessionIdShort = checkout.id.slice(-12).toUpperCase()
-            planId = checkout.metadata?.planId ?? null
-            const plan = getPlan(planId)
-            planName = plan?.name ?? "HireLoop plan"
+            planName = "Pro Plan"
             amount = checkout.amount_total ?? null
             currency = checkout.currency ?? "usd"
             paidAt = new Date(checkout.created * 1000).toLocaleDateString("en-US", {
@@ -45,14 +51,20 @@ export default async function CheckoutSuccessPage({ searchParams }: SearchParams
                 day: "numeric",
                 year: "numeric",
             })
-            status = checkout.payment_status === "paid" ? "paid" : "processing"
+            if (checkout.payment_status === "paid") {
+                status = "paid"
+                // Persist in MongoDB — the backend re-verifies the session with
+                // its own Stripe secret key and credits the buyer from the
+                // session metadata. Idempotent, so refreshing is safe.
+                const recorded = await recordPayment(sessionId)
+                stored = recorded.ok
+            } else {
+                status = "processing"
+            }
         } catch {
             status = "invalid"
         }
     }
-
-    // Role-aware return target
-    const billingHref = "/dashboard/seeker/billing"
 
     return (
         <div className="min-h-svh bg-[#08080a]">
@@ -68,8 +80,8 @@ export default async function CheckoutSuccessPage({ searchParams }: SearchParams
                             Payment successful!
                         </h1>
                         <p className="mx-auto mt-2 max-w-sm text-sm text-[#a0a0ab]">
-                            Thanks for your purchase — your {planName} is active. A receipt has been emailed to you by
-                            Stripe.
+                            Thanks for your purchase — your Pro Plan is active and unlimited applications are
+                            unlocked. A receipt has been emailed to you by Stripe.
                         </p>
 
                         {/* receipt-style summary */}
@@ -99,6 +111,22 @@ export default async function CheckoutSuccessPage({ searchParams }: SearchParams
                                     </span>
                                 </dd>
                             </div>
+                            <div className="flex items-center justify-between border-b border-white/5 py-2.5">
+                                <dt className="text-[13px] text-[#a0a0ab]">Saved to account</dt>
+                                <dd>
+                                    <span
+                                        className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                                            stored ? "text-[#22c55e]" : "text-amber-300"
+                                        }`}
+                                    >
+                                        <span
+                                            aria-hidden="true"
+                                            className={`size-1.5 rounded-full ${stored ? "bg-[#22c55e]" : "bg-amber-300"}`}
+                                        />
+                                        {stored ? "Yes" : "Pending"}
+                                    </span>
+                                </dd>
+                            </div>
                             {sessionIdShort && (
                                 <div className="flex items-center justify-between py-2.5">
                                     <dt className="text-[13px] text-[#a0a0ab]">Session</dt>
@@ -109,21 +137,21 @@ export default async function CheckoutSuccessPage({ searchParams }: SearchParams
 
                         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
                             <Link
-                                href={billingHref}
+                                href={returnTo}
                                 className="inline-flex h-10 items-center justify-center rounded-lg bg-[#fafafa] px-4 text-[13px] font-medium text-[#0b0b0c] transition-colors hover:bg-white"
                             >
-                                Go to Billing &amp; Subscription
+                                Continue where you left off
                             </Link>
                             <Link
-                                href="/dashboard/seeker/jobs"
+                                href="/dashboard"
                                 className="inline-flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#1a1a1f] px-4 text-[13px] text-[#ededef] transition-colors hover:bg-[#232327]"
                             >
-                                Start Job Hunting
+                                Go to Dashboard
                             </Link>
                         </div>
 
-                        {/* persists the purchased plan + toasts, client-side */}
-                        {planId && <SuccessPlanSync planId={planId} planName={planName ?? "your plan"} />}
+                        {/* toasts + returns the user to where they were */}
+                        <SuccessReturn returnTo={returnTo} />
                     </section>
                 ) : status === "processing" ? (
                     <section className="rounded-2xl bg-[#141418] p-8 text-center">
@@ -138,10 +166,10 @@ export default async function CheckoutSuccessPage({ searchParams }: SearchParams
                             moment or check your billing page.
                         </p>
                         <Link
-                            href={billingHref}
+                            href="/dashboard"
                             className="mt-7 inline-flex h-10 items-center justify-center rounded-lg border border-white/10 bg-[#1a1a1f] px-4 text-[13px] text-[#ededef] transition-colors hover:bg-[#232327]"
                         >
-                            Go to Billing &amp; Subscription
+                            Go to Dashboard
                         </Link>
                     </section>
                 ) : (
@@ -157,7 +185,7 @@ export default async function CheckoutSuccessPage({ searchParams }: SearchParams
                             or contact support with your Stripe receipt.
                         </p>
                         <Link
-                            href="/checkout"
+                            href="/checkout?plan=pro"
                             className="mt-7 inline-flex h-10 items-center justify-center rounded-lg bg-[#fafafa] px-4 text-[13px] font-medium text-[#0b0b0c] transition-colors hover:bg-white"
                         >
                             Back to Checkout

@@ -2,26 +2,40 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 
 import { auth } from '@/lib/auth'
-import { getPlan, type PlanId } from '@/lib/plans'
 import { stripe } from '@/lib/stripe'
 
-// Professional Tier lives as a one-time $29 price in the Stripe dashboard;
-// overridable via env for other Stripe accounts/mode switches.
-const PROFESSIONAL_PRICE_ID = process.env.STRIPE_PRICE_ID ?? 'price_1UbxR9FryRrT9G9CVeL1ZlOI'
+// Pro is a one-time $20 payment, created with price_data so it always matches
+// the plan shown on the site (no dashboard price to keep in sync).
+const PRO_PRICE = 2000
 
-async function readPlanId(request: Request): Promise<PlanId | undefined> {
+async function readParams(request: Request): Promise<{ plan?: string; redirect?: string }> {
   try {
     const contentType = request.headers.get('content-type') ?? ''
     if (contentType.includes('application/json')) {
       const body = await request.json()
-      return getPlan(typeof body?.plan === 'string' ? body.plan : undefined)?.id
+      return { plan: body?.plan, redirect: body?.redirect }
     }
     const form = await request.formData()
     const plan = form.get('plan')
-    return getPlan(typeof plan === 'string' ? plan : undefined)?.id
+    const redirect = form.get('redirect')
+    return {
+      plan: typeof plan === 'string' ? plan : undefined,
+      redirect: typeof redirect === 'string' ? redirect : undefined,
+    }
   } catch {
-    return undefined
+    return {}
   }
+}
+
+/**
+ * Only same-origin relative paths may be used as the post-payment return
+ * target — an absolute or protocol-relative value would bounce the user
+ * off-site (open redirect).
+ */
+function safeReturnPath(raw: string | undefined): string {
+  if (!raw) return '/dashboard'
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return '/dashboard'
+  return raw
 }
 
 export async function POST(request: Request) {
@@ -29,36 +43,55 @@ export async function POST(request: Request) {
   const origin = headersList.get('origin')
 
   try {
-    const plan = getPlan(await readPlanId(request)) ?? getPlan('professional')!
+    const { plan: planId, redirect: rawRedirect } = await readParams(request)
+    // the only purchasable plan is Pro; anything else is ignored
+    if (planId !== 'pro') {
+      return NextResponse.redirect(`${origin}/checkout?error=1`, 303)
+    }
+    const returnTo = safeReturnPath(rawRedirect)
 
-    // Stamp who is buying so the success page / records can be tied to a user
+    // Stamp who is buying (checkout prefills + payment record binding)
     const userSession = await auth.api.getSession({ headers: headersList })
+    const user = userSession?.user
+    if (!user) {
+      // signed-out purchase attempt → login first, then back to checkout
+      return NextResponse.redirect(`${origin}/login?redirect=${encodeURIComponent('/checkout?plan=pro')}`, 303)
+    }
 
-    // Create Checkout Sessions from body params.
+    // Real-world checkout: the payer's contact info is attached up front so
+    // Stripe prefills (and the email is verified against) the account.
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 })
+    const customer =
+      customers.data[0] ??
+      (await stripe.customers.create({
+        email: user.email,
+        name: user.name,
+        metadata: { userId: user.id },
+      }))
+
     const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      // prefill/lock the contact info so the payment is tied to this account
+      customer_update: { name: 'never', address: 'never' },
+      phone_number_collection: { enabled: false },
       line_items: [
-        plan.id === 'professional'
-          ? {
-              // Pre-configured product/price from the Stripe dashboard
-              price: PROFESSIONAL_PRICE_ID,
-              quantity: 1,
-            }
-          : {
-              quantity: 1,
-              price_data: {
-                currency: 'usd',
-                unit_amount: plan.price * 100,
-                product_data: { name: `HireLoop ${plan.name}` },
-              },
-            },
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'usd',
+            unit_amount: PRO_PRICE,
+            product_data: { name: 'HireLoop Pro Plan' },
+          },
+        },
       ],
       mode: 'payment',
-      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}&redirect=${encodeURIComponent(returnTo)}`,
       // Real-world checkout: backing out returns to the summary, no charge made
-      cancel_url: `${origin}/checkout?canceled=1&plan=${plan.id}`,
+      cancel_url: `${origin}/checkout?canceled=1&plan=pro&redirect=${encodeURIComponent(returnTo)}`,
       metadata: {
-        planId: plan.id,
-        userId: userSession?.user?.id ?? '',
+        planId: 'pro',
+        userId: user.id,
+        returnTo,
       },
     })
     return NextResponse.redirect(session.url as string, 303)

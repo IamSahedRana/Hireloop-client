@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Check, CircleCheck, Download, Plus } from "lucide-react"
+import { Check, CircleCheck, Download } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/toast"
 import { authClient } from "@/lib/auth-client"
+import { fetchPaymentStatus, type PaymentRecord } from "@/lib/api/payments"
 import { PLANS, type Plan } from "@/lib/plans"
 import { cn } from "@/lib/utils"
 
@@ -24,75 +25,64 @@ const cardClass = "rounded-2xl border border-white/5 bg-[#141418] p-6 sm:p-7"
 const headingClass = "font-heading text-[22px] font-semibold text-[#ededef]"
 const chipClass = "inline-flex h-[21px] items-center rounded-[4px] px-3 text-[11px] font-medium"
 
-const STORAGE_KEY = "hireloop:plan"
-
-function readStoredPlan(): Plan {
-    if (typeof window === "undefined") return PLANS[2] // Figma default: Professional Tier
-    const id = window.localStorage.getItem(STORAGE_KEY)
-    return PLANS.find((plan) => plan.id === id) ?? PLANS[2]
-}
-
-function nextBillingDate() {
-    const date = new Date()
-    date.setMonth(date.getMonth() + 1)
-    return date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
-}
-
-/**
- * Sample invoices until the backend exposes a payments/invoices endpoint —
- * the rows mirror the Billing History table in the Figma frame.
- */
-const SAMPLE_INVOICES = [
-    { date: "Sep 24, 2023", plan: "Professional Tier", amount: "$29.00", trx: "TRX-948102-HL" },
-    { date: "Aug 24, 2023", plan: "Professional Tier", amount: "$29.00", trx: "TRX-771920-HL" },
-    { date: "Jul 24, 2023", plan: "Professional Tier", amount: "$29.00", trx: "TRX-331005-HL" },
-    { date: "Jun 24, 2023", plan: "Standard Tier", amount: "$12.00", trx: "TRX-220199-HL" },
-]
-
 const thClass = "px-4 py-3.5 text-left text-[12px] font-medium text-[#6e6e78]"
 const tdClass = "px-4 py-3.5 text-[13px] text-[#ededef]"
 
+function paidDate(iso: string) {
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
+}
+
 /**
  * Subscription & Billing page body (Figma `Seeker / Billing & Subscription`),
- * shared by the recruiter "Payments" and seeker "Billing" routes.
+ * shared by the recruiter "Payments" and seeker "Billing" routes. The current
+ * plan comes from the backend payments record — never from localStorage.
  */
 export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruiter" }) {
     const router = useRouter()
     const { data: session } = authClient.useSession()
-    const [current, setCurrent] = React.useState<Plan | null>(null)
-    const [billingOn, setBillingOn] = React.useState<string | null>(null)
+    const [current, setCurrent] = React.useState<Plan>(PLANS[0])
+    const [payment, setPayment] = React.useState<PaymentRecord | null>(null)
+    const [loading, setLoading] = React.useState(true)
 
-    // Read localStorage after mount so SSR markup stays stable.
+    // Ask the backend what this account actually paid — so a paid user never
+    // sees the upgrade prompt again (survives refresh, other devices, etc.).
     React.useEffect(() => {
-        setCurrent(readStoredPlan())
-        setBillingOn(nextBillingDate())
-    }, [])
-
-    const applyPlan = (plan: Plan) => {
-        const wasUpgrade = current ? plan.price > current.price : true
-        window.localStorage.setItem(STORAGE_KEY, plan.id)
-        setCurrent(plan)
-        toast.add({
-            title: wasUpgrade ? "Plan upgraded" : "Plan updated",
-            description: `You're now on the ${plan.name}${plan.price ? ` — $${plan.price}/mo` : " — free"}.`,
-            type: "success",
+        const userId = session?.user?.id
+        if (!userId) {
+            setLoading(false)
+            return
+        }
+        let cancelled = false
+        setLoading(true)
+        fetchPaymentStatus(userId).then(({ paid, payment: record }) => {
+            if (cancelled) return
+            setPayment(record)
+            setCurrent(paid ? PLANS[1] : PLANS[0])
+            setLoading(false)
         })
-    }
+        return () => {
+            cancelled = true
+        }
+    }, [session?.user?.id])
 
     /**
-     * Real checkout: paid tiers go through Stripe (order summary → hosted
-     * checkout → verified success page, which persists the plan). Free tiers
-     * apply instantly without payment.
+     * Real checkout: the Pro tier goes through Stripe (order summary → hosted
+     * checkout → verified success page → backend payment record). Free is
+     * already the default; there is no paid→free downgrade to purchase.
      */
     const selectPlan = (plan: Plan) => {
         if (plan.price > 0) {
             router.push(`/checkout?plan=${plan.id}`)
             return
         }
-        applyPlan(plan)
+        toast.add({
+            title: "Already on Free",
+            description: "You'll move to the Free plan automatically if a Pro payment is refunded.",
+            type: "info",
+        })
     }
 
-    const plan = current ?? PLANS[2]
+    const plan = current
     const holder = (session?.user?.name || "HireLoop User").toUpperCase()
 
     return (
@@ -103,8 +93,8 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                     Subscription &amp; Billing
                 </h1>
                 <p className="text-[15px] text-[#a0a0ab] sm:text-base">
-                    Manage your {area === "recruiter" ? "hiring tier" : "professional tier"} features, recurring
-                    payments, and billing history.
+                    Manage your {area === "recruiter" ? "hiring tier" : "application tier"}, payments, and billing
+                    history.
                 </p>
             </header>
 
@@ -119,7 +109,7 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                     <div className="flex flex-wrap items-start justify-between gap-6">
                         <div className="flex min-w-0 flex-col gap-2.5">
                             <span className={cn(chipClass, "w-fit bg-white text-[#6e6e78]")}>CURRENT PLAN</span>
-                            <h2 className={headingClass}>{plan.name}</h2>
+                            <h2 className={headingClass}>{loading ? "Loading…" : plan.name}</h2>
                             <p className="text-[13px] text-[#a0a0ab]">{plan.blurb}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -128,11 +118,11 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                                     {plan.price ? `$${plan.price}` : "Free"}
                                 </span>
                                 {plan.price > 0 && (
-                                    <span className="pt-1 text-base font-semibold text-[#a0a0ab]">/mo</span>
+                                    <span className="pt-1 text-base font-semibold text-[#a0a0ab]">one-time</span>
                                 )}
                             </p>
                             <p className="text-xs whitespace-nowrap text-[#a0a0ab]">
-                                {plan.price > 0 && billingOn ? `Next billing date: ${billingOn}` : "No recurring billing"}
+                                {plan.price > 0 ? "Lifetime Pro access" : "3 applications included"}
                             </p>
                         </div>
                     </div>
@@ -147,26 +137,41 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                     </ul>
 
                     <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-white/5 pt-6">
-                        <PlanPickerDialog
-                            plans={PLANS}
-                            currentId={plan.id}
-                            onSelect={selectPlan}
-                            trigger={
-                                <Button className="h-8 bg-[#fafafa] px-4 text-[13px] font-medium text-[#0b0b0c] hover:bg-white">
-                                    Upgrade Plan
+                        {plan.id === "pro" ? (
+                            <span
+                                className={cn(
+                                    chipClass,
+                                    "border border-[#22c55e]/30 bg-[#22c55e]/10 text-[#22c55e]",
+                                )}
+                            >
+                                PRO ACCESS UNLOCKED
+                            </span>
+                        ) : (
+                            <>
+                                <Button
+                                    type="button"
+                                    onClick={() => router.push("/checkout?plan=pro")}
+                                    disabled={loading}
+                                    className="h-8 bg-[#fafafa] px-4 text-[13px] font-medium text-[#0b0b0c] hover:bg-white"
+                                >
+                                    Upgrade to Pro — $20
                                 </Button>
-                            }
-                        />
-                        <PlanPickerDialog
-                            plans={PLANS}
-                            currentId={plan.id}
-                            onSelect={selectPlan}
-                            trigger={
-                                <Button className="h-8 border border-white/10 bg-[#1a1a1f] px-4 text-[13px] text-[#ededef] hover:bg-[#232327]">
-                                    Manage Plan
-                                </Button>
-                            }
-                        />
+                                <PlanPickerDialog
+                                    plans={PLANS}
+                                    currentId={plan.id}
+                                    onSelect={selectPlan}
+                                    trigger={
+                                        <Button
+                                            type="button"
+                                            disabled={loading}
+                                            className="h-8 border border-white/10 bg-[#1a1a1f] px-4 text-[13px] text-[#ededef] hover:bg-[#232327]"
+                                        >
+                                            Manage Plan
+                                        </Button>
+                                    }
+                                />
+                            </>
+                        )}
                     </div>
                 </section>
 
@@ -190,18 +195,24 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                         </div>
                         <div className="flex flex-col gap-4">
                             <p className="font-heading text-[22px] font-semibold tracking-wide text-[#ededef]">
-                                •••• •••• •••• 4242
+                                {payment ? "•••• •••• •••• 4242" : "No card on file"}
                             </p>
                             <div className="flex items-end justify-between gap-6">
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-[11px] font-medium tracking-wide text-[#a0a0ab]">
                                         CARD HOLDER
                                     </span>
-                                    <span className="truncate text-[13px] text-[#ededef]">{holder}</span>
+                                    <span className="truncate text-[13px] text-[#ededef]">
+                                        {payment ? holder : "—"}
+                                    </span>
                                 </div>
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-[11px] font-medium tracking-wide text-[#a0a0ab]">EXPIRES</span>
-                                    <span className="text-[13px] text-[#ededef]">12/29</span>
+                                    <span className="text-[11px] font-medium tracking-wide text-[#a0a0ab]">
+                                        {payment ? "PAID ON" : "STATUS"}
+                                    </span>
+                                    <span className="text-[13px] text-[#ededef]">
+                                        {payment ? paidDate(payment.paidAt) : "Free plan"}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -211,15 +222,14 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                         type="button"
                         onClick={() =>
                             toast.add({
-                                title: "Stripe integration coming soon",
-                                description: "Card management activates with the payments backend.",
+                                title: "Card management coming soon",
+                                description: "Your checkout payment was handled securely by Stripe.",
                                 type: "info",
                             })
                         }
                         className="mt-6 h-9 w-full border border-white/10 bg-[#1a1a1f] text-[13px] text-[#a0a0ab] hover:bg-[#232327] hover:text-[#ededef]"
                     >
-                        <Plus aria-hidden="true" className="size-4" />
-                        Add New Payment Method
+                        Manage Card Details
                     </Button>
                 </section>
             </div>
@@ -252,13 +262,15 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                                 </tr>
                             </thead>
                             <tbody>
-                                {SAMPLE_INVOICES.map((invoice) => (
-                                    <tr key={invoice.trx} className="border-t border-white/5">
-                                        <td className={cn(tdClass, "whitespace-nowrap")}>{invoice.date}</td>
-                                        <td className={tdClass}>{invoice.plan}</td>
-                                        <td className={cn(tdClass, "whitespace-nowrap")}>{invoice.amount}</td>
+                                {payment ? (
+                                    <tr className="border-t border-white/5">
+                                        <td className={cn(tdClass, "whitespace-nowrap")}>{paidDate(payment.paidAt)}</td>
+                                        <td className={tdClass}>Pro Plan</td>
+                                        <td className={cn(tdClass, "whitespace-nowrap")}>
+                                            ${(payment.amount / 100).toFixed(2)} {payment.currency.toUpperCase()}
+                                        </td>
                                         <td className={cn(tdClass, "font-mono text-xs whitespace-nowrap text-[#a0a0ab]")}>
-                                            {invoice.trx}
+                                            …{payment.sessionId.slice(-16).toUpperCase()}
                                         </td>
                                         <td className={cn(tdClass, "text-right")}>
                                             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#22c55e]">
@@ -267,7 +279,15 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
                                             </span>
                                         </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    <tr className="border-t border-white/5">
+                                        <td colSpan={5} className={cn(tdClass, "text-center text-[#a0a0ab]")}>
+                                            {loading
+                                                ? "Loading…"
+                                                : "No payments yet — you're on the Free plan (3 applications)."}
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -326,7 +346,7 @@ export function BillingContent({ area = "seeker" }: { area?: "seeker" | "recruit
     )
 }
 
-/** Plan chooser shown by both "Upgrade Plan" and "Manage Plan". */
+/** Plan chooser shown by "Manage Plan". */
 function PlanPickerDialog({
     plans,
     currentId,
@@ -338,20 +358,17 @@ function PlanPickerDialog({
     onSelect: (plan: Plan) => void
     trigger: React.ReactElement
 }) {
-    // controlled so a selection can close the dialog before navigating
-    const [open, setOpen] = React.useState(false)
-
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog>
             <DialogTrigger render={trigger} />
-            <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+            <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="text-left">Choose your plan</DialogTitle>
                     <DialogDescription className="text-left">
-                        Switch anytime — paid tiers go through a secure Stripe checkout.
+                        Pro goes through a secure Stripe checkout and unlocks unlimited applications instantly.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                     {plans.map((plan) => {
                         const isCurrent = plan.id === currentId
                         return (
@@ -359,10 +376,7 @@ function PlanPickerDialog({
                                 key={plan.id}
                                 type="button"
                                 disabled={isCurrent}
-                                onClick={() => {
-                                    onSelect(plan)
-                                    setOpen(false)
-                                }}
+                                onClick={() => onSelect(plan)}
                                 className={cn(
                                     "flex flex-col gap-3 rounded-xl border p-4 text-left transition-colors",
                                     isCurrent
@@ -375,7 +389,7 @@ function PlanPickerDialog({
                                     <span className="font-heading text-xl font-semibold text-[#ededef]">
                                         {plan.price ? `$${plan.price}` : "Free"}
                                     </span>
-                                    {plan.price > 0 && <span className="text-xs text-[#a0a0ab]">/mo</span>}
+                                    {plan.price > 0 && <span className="text-xs text-[#a0a0ab]">one-time</span>}
                                 </span>
                                 <ul className="flex flex-col gap-1.5">
                                     {plan.features.map((feature) => (

@@ -11,19 +11,31 @@ import { SiteNavbar } from "@/components/site-navbar"
 
 export const metadata: Metadata = {
     title: "Checkout — HireLoop",
-    description: "Secure checkout for your HireLoop plan upgrade.",
+    description: "Secure checkout for your HireLoop Pro upgrade.",
 }
 
-type SearchParams = { params?: never; searchParams: Promise<{ plan?: string; canceled?: string; error?: string }> }
+type SearchParams = { searchParams: Promise<{ plan?: string; redirect?: string; canceled?: string; error?: string }> }
+
+/**
+ * Only same-origin relative paths may be used as the post-payment return
+ * target (mirrors the API route's guard).
+ */
+function safeReturnPath(raw: string | undefined): string {
+    if (!raw) return "/dashboard"
+    if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/dashboard"
+    return raw
+}
 
 export default async function CheckoutPage({ searchParams }: SearchParams) {
-    const { plan: planId, canceled, error } = await searchParams
-    const plan = getPlan(planId) ?? getPlan("professional")!
+    const { plan: planId, redirect: rawRedirect, canceled, error } = await searchParams
+    // the only purchasable plan is Pro; anything else resolves to Pro
+    const plan = getPlan(planId) ?? getPlan("pro")!
+    const returnTo = safeReturnPath(rawRedirect)
 
     // Real checkout = signed-in purchase; bounce to login and come straight back
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
-        redirect(`/login?redirect=${encodeURIComponent(`/checkout?plan=${plan.id}`)}`)
+        redirect(`/login?redirect=${encodeURIComponent(`/checkout?plan=${plan.id}&redirect=${returnTo}`)}`)
     }
 
     const billingHref = session.user.role === "recruiter" ? "/dashboard/recruiter/payments" : "/dashboard/seeker/billing"
@@ -105,6 +117,8 @@ export default async function CheckoutPage({ searchParams }: SearchParams) {
                         to Stripe's hosted checkout (no JS needed, no CORS issues). */}
                     <form action="/api/checkout_sessions" method="post" className="mt-6">
                         <input type="hidden" name="plan" value={plan.id} />
+                        {/* where to return after payment (e.g. the job the user was applying to) */}
+                        <input type="hidden" name="redirect" value={returnTo} />
                         <button
                             type="submit"
                             className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#fafafa] text-base font-medium text-[#0b0b0c] transition-colors hover:bg-white"
@@ -121,8 +135,8 @@ export default async function CheckoutPage({ searchParams }: SearchParams) {
                 </section>
 
                 <p className="mt-4 text-center text-xs text-[#6e6e78]">
-                    Purchasing {plan.name.replace(" Tier", "")} gives you instant access — manage or switch anytime from
-                    Billing &amp; Subscription.
+                    Pro unlocks unlimited applications instantly — your contact details are taken from your HireLoop
+                    account so Stripe can verify you.
                 </p>
             </main>
 

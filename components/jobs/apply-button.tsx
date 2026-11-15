@@ -37,6 +37,8 @@ export function ApplyButton({
     const { data: session, isPending } = authClient.useSession()
     const [applied, setApplied] = React.useState(false)
     const [submitting, setSubmitting] = React.useState(false)
+    // set once the backend rejects an apply with the free-plan paywall (402)
+    const [limitReached, setLimitReached] = React.useState(false)
 
     // signed in → check whether this job is already applied to
     React.useEffect(() => {
@@ -54,7 +56,7 @@ export function ApplyButton({
     async function handleApply() {
         if (!session?.user) return
         setSubmitting(true)
-        const ok = await createApplication({
+        const result = await createApplication({
             userId: session.user.id,
             jobId,
             jobTitle: title,
@@ -62,7 +64,7 @@ export function ApplyButton({
             candidateName: session.user.name ?? "",
         })
         setSubmitting(false)
-        if (ok) {
+        if (result.ok) {
             setApplied(true)
             toast.add({
                 title: "Application submitted",
@@ -70,6 +72,14 @@ export function ApplyButton({
                 type: "success",
             })
             router.refresh() // keeps the applicant counter in sync
+        } else if (result.limitReached) {
+            // free-plan paywall: swap the button into an upgrade action
+            setLimitReached(true)
+            toast.add({
+                title: "Free plan limit reached",
+                description: result.message ?? "Upgrade to Pro to keep applying.",
+                type: "warning",
+            })
         } else {
             toast.add({
                 title: "Couldn't submit application",
@@ -99,6 +109,19 @@ export function ApplyButton({
                 className={cn(buttonClass, "bg-[#fafafa] text-[#0b0b0c] hover:bg-white", className)}
             >
                 Apply Now
+            </Link>
+        )
+    }
+
+    // free-plan paywall hit → the apply action becomes the upgrade path and
+    // returns to this page after payment so the user can apply right away
+    if (limitReached) {
+        return (
+            <Link
+                href={`/checkout?plan=pro&redirect=${encodeURIComponent(redirectTo)}`}
+                className={cn(buttonClass, "bg-[#22c55e] text-[#0b0b0c] hover:bg-[#1eb355]", className)}
+            >
+                Upgrade to Pro — $20
             </Link>
         )
     }

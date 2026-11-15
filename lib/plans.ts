@@ -1,13 +1,14 @@
 /**
  * Subscription tiers shared by BillingContent, the checkout page and the
- * Stripe checkout session (Figma `Seeker / Billing & Subscription`).
+ * Stripe checkout session. HireLoop has exactly two tiers:
+ * Free (limited applications) and Pro ($20, unlimited applications).
  */
-export type PlanId = "starter" | "standard" | "professional"
+export type PlanId = "free" | "pro"
 
 export type Plan = {
     id: PlanId
     name: string
-    /** Monthly price in USD; 0 = free tier. */
+    /** One-time price in USD; 0 = free tier. */
     price: number
     blurb: string
     features: string[]
@@ -15,24 +16,17 @@ export type Plan = {
 
 export const PLANS: Plan[] = [
     {
-        id: "starter",
-        name: "Starter Tier",
+        id: "free",
+        name: "Free Plan",
         price: 0,
         blurb: "Get to know the platform with core job discovery.",
-        features: ["10 Applications / month", "Basic job matching", "Email support"],
+        features: ["3 Applications", "Basic job matching", "Email support"],
     },
     {
-        id: "standard",
-        name: "Standard Tier",
-        price: 12,
-        blurb: "Level up your search with insights and faster apply.",
-        features: ["Unlimited Applications", "Premium Job Insights", "Priority Candidate Badge"],
-    },
-    {
-        id: "professional",
-        name: "Professional Tier",
-        price: 29,
-        blurb: "Unlock global job insights and unlimited applications.",
+        id: "pro",
+        name: "Pro Plan",
+        price: 20,
+        blurb: "Unlimited applications and priority visibility for your profile.",
         features: [
             "Unlimited Applications",
             "Premium Job Insights",
@@ -46,7 +40,7 @@ export function getPlan(id: string | null | undefined): Plan | undefined {
     return PLANS.find((plan) => plan.id === id)
 }
 
-/** "$29.00" — used on checkout/success surfaces. */
+/** "$20.00" — used on checkout/success surfaces. */
 export function formatPrice(amount: number, currency = "usd"): string {
     return new Intl.NumberFormat("en-US", { style: "currency", currency, currencyDisplay: "narrowSymbol" }).format(
         amount,

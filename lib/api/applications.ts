@@ -56,6 +56,10 @@ export async function fetchApplications(filters: { applicantId?: string } = {}):
     }
 }
 
+export type ApplyResult =
+    | { ok: true }
+    | { ok: false; limitReached: boolean; message?: string }
+
 /** `POST /applications` — one-click apply for a signed-in candidate. */
 export async function createApplication(input: {
     userId: string
@@ -63,16 +67,22 @@ export async function createApplication(input: {
     jobTitle: string
     companyName: string
     candidateName: string
-}): Promise<boolean> {
+}): Promise<ApplyResult> {
     try {
         const res = await fetch(`${BASE_URL}/applications`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ ...input, status: "New", appliedAt: new Date().toISOString() }),
         })
-        return res.ok
+        if (res.ok) return { ok: true }
+        const data = await res.json().catch(() => null)
+        // 402 = free-plan paywall enforced by the backend
+        if (res.status === 402 || data?.error === "limit_reached") {
+            return { ok: false, limitReached: true, message: data?.message }
+        }
+        return { ok: false, limitReached: false, message: data?.message }
     } catch {
-        return false
+        return { ok: false, limitReached: false }
     }
 }
 

@@ -26,6 +26,8 @@ export type JobQueryFilters = {
     category?: string[]
     /** Remote-only toggle. */
     isRemote?: boolean
+    /** Recruiter scoping — only jobs created by this account id. */
+    createdBy?: string
     /**
      * Location filter (hero search "Location or Remote"). The backend has no
      * location param yet, so this is applied after the fetch — "remote"
@@ -42,6 +44,7 @@ export async function getJobs(filters: JobQueryFilters = {}): Promise<Job[]> {
     for (const type of filters.jobType ?? []) params.append("jobType", type)
     for (const category of filters.category ?? []) params.append("category", category)
     if (filters.isRemote !== undefined) params.set("isRemote", String(filters.isRemote))
+    if (filters.createdBy) params.set("createdBy", filters.createdBy)
     const query = params.toString()
 
     const data = await apiFetch(`/jobs${query ? `?${query}` : ""}`)

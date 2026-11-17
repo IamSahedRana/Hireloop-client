@@ -1,29 +1,32 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
+import { redirect } from "next/navigation"
 
+import { AdminUsersManager } from "@/app/components/AdminUsersManager"
 import { DashboardTopBar } from "@/app/components/DashboardTopBar"
 import { DashboardPageHeader } from "@/app/components/DashboardPageHeader"
+import { auth } from "@/lib/auth"
 
 export const metadata: Metadata = {
     title: "Admin · Users — HireLoop",
 }
 
-export default function AdminUsersPage() {
+export default async function AdminUsersPage() {
+    // role guard: only admins reach user management
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) redirect("/login?redirect=/dashboard/admin/users")
+    if (session.user.role !== "admin") redirect(`/dashboard/${session.user.role ?? "seeker"}`)
+
     return (
         <div className="h-svh overflow-y-auto">
             <DashboardTopBar />
             <div className="mx-auto w-full max-w-6xl px-4 py-8">
                 <DashboardPageHeader
                     section="Admin"
-                    title="Users"
-                    subtitle="Every seeker, recruiter and admin account on the platform."
+                    title="User Management"
+                    subtitle="Review, filter, and manage platform access for all users."
                 />
-                <section className="rounded-2xl border border-white/10 bg-[#101010]/95 p-12 text-center">
-                    <h2 className="font-heading text-lg font-semibold text-white">User management coming soon</h2>
-                    <p className="mx-auto mt-1 max-w-sm text-sm text-white/60">
-                        Accounts live in the better-auth collection — a users table lands here once the admin API is
-                        wired up.
-                    </p>
-                </section>
+                <AdminUsersManager />
             </div>
         </div>
     )

@@ -6,7 +6,7 @@ import { Briefcase, Archive, FileText, Plus, Users } from "lucide-react"
 
 import { auth } from "@/lib/auth"
 import { getJobs } from "@/lib/api/jobs"
-import { getApplications } from "@/lib/api/applications"
+import { fetchApplications } from "@/lib/api/applications"
 import { ApplicationsTable } from "@/app/components/ApplicationsTable"
 import { DashboardTopBar } from "@/app/components/DashboardTopBar"
 import { cn } from "@/lib/utils"
@@ -29,7 +29,13 @@ export default async function RecruiterDashboardPage() {
     // role guard: a signed-in seeker/admin doesn't belong on the recruiter home
     if (session.user.role !== "recruiter") redirect(`/dashboard/${session.user.role ?? "seeker"}`)
 
-    const [jobs, applications] = await Promise.all([getJobs(), getApplications()])
+    // scoping: a recruiter only sees their own job posts and the
+    // applications submitted to those posts
+    const recruiterId = String(session.user.id)
+    const [jobs, applications] = await Promise.all([
+        getJobs({ createdBy: recruiterId }),
+        fetchApplications({ ownerId: recruiterId }),
+    ])
 
     const totals = {
         posts: jobs.length,
@@ -82,7 +88,17 @@ export default async function RecruiterDashboardPage() {
                             View all
                         </Link>
                     </div>
-                    <ApplicationsTable rows={applications.slice(0, 4)} className="mt-6" />
+                    <ApplicationsTable
+                        rows={applications.slice(0, 4).map((app) => ({
+                            _id: app._id,
+                            candidateName: app.candidateName,
+                            role: app.jobTitle,
+                            dateApplied: app.appliedAt,
+                            experience: "—",
+                            status: app.status,
+                        }))}
+                        className="mt-6"
+                    />
                 </section>
             </div>
 

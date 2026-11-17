@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { createJob, updateJob } from "@/lib/actions/jobs"
+import { authClient } from "@/lib/auth-client"
 import { COMPANY_STORAGE_KEY } from "@/app/components/CompanyForm"
 import type { Job, JobFormData, JobType } from "@/lib/types/job"
 import { JOB_CATEGORIES, JOB_TYPES } from "@/lib/types/job"
@@ -80,6 +81,9 @@ const copy = {
  */
 export function JobForm({ mode, job }: { mode: "create" | "edit"; job?: Job | null }) {
     const router = useRouter()
+    // session id stamps `createdBy` on new jobs so the recruiter dashboard
+    // only lists their own listings
+    const { data: session } = authClient.useSession()
     const [initial] = React.useState(() => (job ? toForm(job) : EMPTY_FORM))
     const [form, setForm] = React.useState<JobFormData>({ ...initial, deadline: toDateInput(job?.deadline) })
     const [submitting, setSubmitting] = React.useState(false)
@@ -111,7 +115,7 @@ export function JobForm({ mode, job }: { mode: "create" | "edit"; job?: Job | nu
         setSubmitting(true)
         setError(null)
 
-        const result = mode === "edit" && job ? await updateJob(job._id, form) : await createJob(form)
+        const result = mode === "edit" && job ? await updateJob(job._id, form) : await createJob(form, session?.user?.id)
         setSubmitting(false)
 
         if ("error" in result) {

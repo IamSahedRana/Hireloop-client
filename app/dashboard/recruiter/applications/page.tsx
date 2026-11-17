@@ -1,15 +1,46 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
+import { redirect } from "next/navigation"
 
-import { ApplicationsTable } from "@/app/components/ApplicationsTable"
+import { RecruiterApplicationsBoard } from "@/app/components/RecruiterApplicationsBoard"
 import { DashboardTopBar } from "@/app/components/DashboardTopBar"
-import { getApplications } from "@/lib/api/applications"
+import { auth } from "@/lib/auth"
+import { fetchApplications, type ApplicationRow } from "@/lib/api/applications"
+import { getJobs } from "@/lib/api/jobs"
 
 export const metadata: Metadata = {
     title: "Applications — HireLoop",
 }
 
-export default async function RecruiterApplicationsPage() {
-    const applications = await getApplications()
+export default async function RecruiterApplicationsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ job?: string }>
+}) {
+    const { job } = await searchParams
+
+    // role guard + scoping: recruiters review applications to their own jobs only
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) redirect("/login?redirect=/dashboard/recruiter/applications")
+    if (session.user.role !== "recruiter") redirect(`/dashboard/${session.user.role ?? "seeker"}`)
+    const recruiterId = String(session.user.id)
+
+    const selectedJobId = job?.trim() || undefined
+    const [ownJobs, applications] = await Promise.all([
+        getJobs({ createdBy: recruiterId }),
+        fetchApplications(selectedJobId ? { jobId: selectedJobId, ownerId: recruiterId } : { ownerId: recruiterId }),
+    ])
+
+    // the selector only lists this recruiter's jobs
+    const boardJobs = ownJobs.map((job) => ({ _id: job._id, title: job.title }))
+    const rows: ApplicationRow[] = applications.map((app) => ({
+        _id: app._id,
+        candidateName: app.candidateName,
+        role: app.jobTitle,
+        dateApplied: app.appliedAt,
+        experience: "—",
+        status: app.status,
+    }))
 
     return (
         <div className="h-svh overflow-y-auto">
@@ -27,11 +58,12 @@ export default async function RecruiterApplicationsPage() {
                         Applications
                     </h1>
                     <p className="text-sm text-white/60">
-                        Every candidate that applied across your job posts, newest first.
+                        Every candidate that applied across your job posts, newest first. Change a status to move a
+                        candidate through the pipeline.
                     </p>
                 </header>
 
-                <ApplicationsTable rows={applications} />
+                <RecruiterApplicationsBoard jobs={boardJobs} applications={rows} selectedJobId={selectedJobId} />
             </div>
         </div>
     )

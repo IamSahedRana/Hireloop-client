@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth"
+import { admin } from "better-auth/plugins"
 import { MongoClient } from "mongodb"
 import { mongodbAdapter } from "@better-auth/mongo-adapter"
 
@@ -8,6 +9,14 @@ const db = client.db("hireloopdb")
 export const auth = betterAuth({
     //...
 
+    // admin plugin: /admin/list-users, /admin/set-role, /admin/ban-user…
+    // guards every route so only session.user.role === "admin" may call them.
+    plugins: [
+        admin({
+            // our role field is a single string — one admin role only
+            adminRoles: ["admin"],
+        }),
+    ],
     emailAndPassword: {
         enabled: true,
     },

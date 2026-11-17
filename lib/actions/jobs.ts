@@ -17,11 +17,12 @@ function fallbackMessage(status: number) {
     return "The backend request failed. Check that the API is running."
 }
 
-export const createJob = async (data: JobFormData) => {
+export const createJob = async (data: JobFormData, createdBy?: string) => {
     const res = await fetch(`${BASE_URL}/jobs`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(data),
+        // `createdBy` scopes the job to the recruiter who published it
+        body: JSON.stringify(createdBy ? { ...data, createdBy } : data),
     })
     return toResult(res, { acknowledged: false })
 }

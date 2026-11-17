@@ -37,10 +37,15 @@ function normalize(item: Record<string, unknown>): Application {
     }
 }
 
-/** `GET /applications` — optionally narrowed to one applicant. */
-export async function fetchApplications(filters: { applicantId?: string } = {}): Promise<Application[]> {
+/** `GET /applications` — narrowed by applicant, by job, or by job owner
+ * (recruiter scoping: the backend joins on jobs `createdBy`). */
+export async function fetchApplications(
+    filters: { applicantId?: string; jobId?: string; ownerId?: string } = {},
+): Promise<Application[]> {
     const params = new URLSearchParams()
     if (filters.applicantId) params.set("applicantId", filters.applicantId)
+    if (filters.jobId) params.set("jobId", filters.jobId)
+    if (filters.ownerId) params.set("ownerId", filters.ownerId)
     const query = params.toString()
     try {
         const res = await fetch(`${BASE_URL}/applications${query ? `?${query}` : ""}`, { cache: "no-store" })
@@ -94,6 +99,25 @@ export type ApplicationRow = {
     dateApplied: string
     experience: string
     status: ApplicationStatus
+}
+
+/** `PATCH /applications/:id` — recruiter moves an application through the pipeline. */
+export async function updateApplicationStatus(
+    id: string,
+    status: ApplicationStatus,
+): Promise<{ ok: boolean; message?: string }> {
+    try {
+        const res = await fetch(`${BASE_URL}/applications/${id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ status }),
+        })
+        if (res.ok) return { ok: true }
+        const data = await res.json().catch(() => null)
+        return { ok: false, message: data?.message }
+    } catch {
+        return { ok: false }
+    }
 }
 
 export async function getApplications(): Promise<ApplicationRow[]> {

@@ -1,6 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { headers } from "next/headers"
+import { redirect } from "next/navigation"
 
+import { auth } from "@/lib/auth"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { MoreHorizontal, Pencil, Plus, Users } from "lucide-react"
@@ -46,7 +49,13 @@ export default async function RecruiterJobsPage({
 }) {
     const { q } = await searchParams
     const query = (q ?? "").trim().toLowerCase()
-    const allJobs: Job[] = await getJobs()
+
+    // role guard + scoping: a recruiter only manages their own listings
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) redirect("/login?redirect=/dashboard/recruiter/jobs")
+    if (session.user.role !== "recruiter") redirect(`/dashboard/${session.user.role ?? "seeker"}`)
+
+    const allJobs: Job[] = await getJobs({ createdBy: String(session.user.id) })
     const jobs = query
         ? allJobs.filter((job) =>
             `${job.title} ${job.companyName} ${job.category} ${job.location}`.toLowerCase().includes(query),
